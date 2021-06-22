@@ -1,6 +1,5 @@
 from Signature import Signature
 
-
 class Message:
     def __init__(self, payload, sender_id, round_sent, signatures: list[Signature] = []):
         self.payload = payload
