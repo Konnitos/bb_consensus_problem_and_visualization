@@ -8,6 +8,7 @@ NUM_OF_TRAITORS = 0
 NUM_OF_NODES = 2
 FORCE_TRAITOR_LEADER = False
 START_SCREEN = True
+REPLAY_SCREEN = False
 
 def load_image(file):
     """ loads an image, prepares it for play
@@ -35,9 +36,10 @@ def load_sound(file):
 class Leader(pygame.sprite.Sprite):
     images = []
 
-    def __init__(self, starting_point):
+    def __init__(self, starting_point, is_traitor = False):
         pygame.sprite.Sprite.__init__(self, self.containers)
-        self.image = self.images[0]
+        self.is_traitor = is_traitor
+        self.image = self.images[is_traitor] 
         self.rect = self.image.get_rect(topleft=starting_point)
 
 class General(pygame.sprite.Sprite):
@@ -135,13 +137,10 @@ def main():
     # loading in assets
     leader = load_image("leader.png")
     arrow = load_image("arrow.png")
-    Leader.images = [leader]
-    General.images = [load_image("general.png")]
+    Leader.images = [leader, load_image("tleader.png")]
+    General.images = [load_image("general.png"), load_image("tgeneral.png")]
     Message.images = [load_image("letter.png")] 
     CheckButton.images = [load_image("uncheckedbox.png"), load_image("checkedbox.png")]
-    pop = load_sound("pop.mp3")
-    dink = load_sound("dink.wav")
-    valid_message = load_sound("valid_message.ogg")
 
     # setting basic window view
     icon = pygame.transform.scale(leader,(32,32))
@@ -161,9 +160,17 @@ def main():
     Node_count_text_field.containers = all
     Traitor_count_text_field.containers = all
 
+    start_screen(clock, screen, background, arrow, all)
+
+    all.clear(screen, background)
+    all.empty()
+    pygame.display.update()
+
+    bb_replay(clock, screen,background, all)
+    
+def start_screen(clock, screen, background, arrow, all):
     buttons = []
 
-       
     Text_field((20,20), "BB Consensus In Action", 100)
 
     force_traitor_leader_button = CheckButton((20, 100), force_traitor_leader_checkbox_callback)
@@ -190,17 +197,9 @@ def main():
     start_simulation_text_field = Text_field((20, 400), "Start Simulation !", 40)
     start_simulation_button = Button((start_simulation_text_field.rect.right + 10, start_simulation_text_field.rect.top), pygame.transform.rotate(arrow, -90), start_simulation_callback)
     buttons.append(start_simulation_button)
-    
-    all.update()
 
-    dirty = all.draw(screen)
-    pygame.display.update(dirty)
-
-    # messages_sent_by_nodes_per_round = run_bb_simulation_and_process_output()
-
-    run = True
     pause = False
-    while run:
+    while START_SCREEN:
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
@@ -210,7 +209,7 @@ def main():
             if(pause): break
 
             if event.type == pygame.QUIT:
-                run = False
+                pygame.quit()
             
             if event.type == pygame.MOUSEBUTTONDOWN:
                 x,y = event.pos
@@ -229,7 +228,57 @@ def main():
 
         clock.tick(FPS)
 
-    # pygame.quit()
+def bb_replay(clock , screen , background, all):
+    
+    Text_field((20,20), "Simulating BB Consensus", 75)
+
+    all.update()
+    pygame.display.update(all.draw(screen))
+
+    round_dict = run_bb_simulation_and_process_output()
+
+    pop = load_sound("pop.mp3")
+    dink = load_sound("dink.wav")
+    valid_message = load_sound("valid_message.ogg")
+    
+    pygame.time.wait(1000)
+    all.clear(screen, background)
+    all.empty()
+    pygame.display.update()
+    
+    buttons = []
+
+    pause = False
+    while REPLAY_SCREEN:
+
+        for event in pygame.event.get():
+            # if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            #     pause = not pause
+            #     print(pause)
+
+            if(pause): break
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x,y = event.pos
+                for button in buttons:
+                    if button.rect.collidepoint(x,y):
+                        button.callback()
+
+        if(pause): continue
+
+        all.clear(screen,background)
+
+        all.update()
+
+        dirty = all.draw(screen)
+        pygame.display.update(dirty)
+
+        clock.tick(FPS)
+
+    
 
 def force_traitor_leader_checkbox_callback():
     global FORCE_TRAITOR_LEADER
@@ -257,7 +306,9 @@ def num_of_traitors_decrease_callback():
 
 def start_simulation_callback():
     global START_SCREEN 
+    global REPLAY_SCREEN
     START_SCREEN = False
+    REPLAY_SCREEN = True
 
 def run_bb_simulation_and_process_output():
     network = run_bb_simulation(NUM_OF_NODES, NUM_OF_TRAITORS, FORCE_TRAITOR_LEADER)
