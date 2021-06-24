@@ -50,12 +50,13 @@ class General(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.image = self.images[is_traitor] 
         self.rect = self.image.get_rect(topleft=starting_point)
+        self.extracted_set = {}
 
 class Message(pygame.sprite.Sprite):
     images = []
     speed = 5
 
-    def __init__(self, starting_point, payload, y_distance, is_up, enter_left):
+    def __init__(self, starting_point, payload, y_distance, is_up, enter_left, is_valid):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.image = self.images[0]
         self.rect = self.image.get_rect(topleft=starting_point)
@@ -71,6 +72,7 @@ class Message(pygame.sprite.Sprite):
         self.enter_left = enter_left
         self.enter_x_done = False
         self.step = 0
+        self.is_valid = is_valid
         self.font = pygame.font.Font(None, 30)
         self.color = pygame.Color("Black")
 
@@ -84,10 +86,7 @@ class Message(pygame.sprite.Sprite):
         if(self.step == 2):
             self.enter()
 
-        self.draw_payload()
-
-    def draw_payload(self):
-        self.image.blit(self.font.render(str(self.payload), 0, self.color), (4,8))            
+        self.image.blit(self.font.render(str(self.payload), 0, self.color), (4,8))
 
     def exit(self):
         if(self.rect.right <= self.leave_start_x and not self.leave_start_x_done):
@@ -102,7 +101,6 @@ class Message(pygame.sprite.Sprite):
             self.rect.move_ip(0,(self.speed * self.is_up))
         else:
             self.y_distance_done = True
-            self.step = 2
 
     def enter(self):
         if(self.enter_x_moved <= self.enter_x_value):
@@ -316,7 +314,7 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     round_text_field = Text_field((0,0), "Round: ", 70)
     round_count_text_field = Text_field((round_text_field.rect.right,0), str(round_count) ,70)
 
-    draw_messages(round_count, node_sending, nodes, round_dict, all , screen, message_out)
+    sent_messages = draw_messages(round_count, node_sending, nodes, round_dict, all , screen, message_out)
 
     pause = False
     while REPLAY_SCREEN:
@@ -341,6 +339,13 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
         round_count_text_field.text = str(round_count)
 
         all.update()
+
+        for message in pygame.sprite.groupcollide(message_group, node_group, 1, 0).keys():
+            if(message.is_valid):
+                valid_message.play()
+            else:
+                dink.play()
+
         dirty = all.draw(screen)
         pygame.display.update(dirty)
 
@@ -350,19 +355,23 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
 
 def draw_messages(round_count, node_sending, nodes, round_dict, all, screen, message_out):
     messages_to_draw = round_dict[round_count][node_sending]
+    messages = []
 
     for message in messages_to_draw:
         starting_node = nodes[message.sender_id]
+        print(message.sender_id)
+        
         ending_node = nodes[message.reciver_id]
+        print(message.reciver_id)
 
         y_distance = (ending_node.rect.top - starting_node.rect.top) + 18
         is_up = -1 if (y_distance < 0 ) else 1
         enter_left = 1 if (node_sending == 0) else -1
-        Message((starting_node.rect.right + 1, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left)
-
-
-    pygame.display.update(all.draw(screen))
-    message_out.play()   
+        sending_message = Message((starting_node.rect.right + 3, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left, message.is_valid)
+        messages.append(sending_message)
+    
+    message_out
+    return messages
         
 
 def force_traitor_leader_checkbox_callback():

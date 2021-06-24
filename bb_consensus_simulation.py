@@ -67,7 +67,8 @@ def get_consensus(rounds, network: dict[int:Node], public_keys):
 def broadcast(message: Message, receiving_nodes: list[Node]):
     for node in receiving_nodes:
         if(node.id != message.sender_id):
-            node.to_be_received_messages.append(message)
+            broadcast_message = Message(message.payload, message.sender_id, message.round_sent, message.signatures)
+            node.to_be_received_messages.append(broadcast_message)
 
 def receive_messages_from_broadcast(nodes: list[Node]):
     for node in nodes:
