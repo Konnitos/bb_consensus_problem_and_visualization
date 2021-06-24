@@ -50,7 +50,7 @@ class General(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.image = self.images[is_traitor] 
         self.rect = self.image.get_rect(topleft=starting_point)
-        self.extracted_set = {}
+        self.extracted_set = set()
 
 class Message(pygame.sprite.Sprite):
     images = []
@@ -101,6 +101,7 @@ class Message(pygame.sprite.Sprite):
             self.rect.move_ip(0,(self.speed * self.is_up))
         else:
             self.y_distance_done = True
+            self.step = 2
 
     def enter(self):
         if(self.enter_x_moved <= self.enter_x_value):
@@ -293,6 +294,7 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     
     buttons = []
     nodes = []
+    general_sets = {}
 
     leader = Leader((64, (SCREENRECT.bottom/2) -32), network[0].is_traitor)
     pygame.display.update(all.draw(screen))
@@ -302,9 +304,13 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     for i in range(1, NUM_OF_NODES):
         pygame.time.wait(500)
         general = General((320, (i*104)), network[i].is_traitor)
+        general_extracted_set = Text_field((general.rect.left, general.rect.bottom + 5), str(general.extracted_set), 40)
+
         pygame.display.update(all.draw(screen))
         pop.play()
+
         nodes.append(general)
+        general_sets[1] = general_extracted_set
 
     pygame.time.wait(500)
     
@@ -338,11 +344,15 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
 
         round_count_text_field.text = str(round_count)
 
+        for (id, set_text_field) in general_sets.items():
+            set_text_field.text = str(nodes[id].extracted_set)
+
         all.update()
 
-        for message in pygame.sprite.groupcollide(message_group, node_group, 1, 0).keys():
+        for (message, node) in pygame.sprite.groupcollide(message_group, node_group, 1, 0).items():
             if(message.is_valid):
                 valid_message.play()
+                node[0].extracted_set.add(message.payload)
             else:
                 dink.play()
 
@@ -359,18 +369,16 @@ def draw_messages(round_count, node_sending, nodes, round_dict, all, screen, mes
 
     for message in messages_to_draw:
         starting_node = nodes[message.sender_id]
-        print(message.sender_id)
-        
-        ending_node = nodes[message.reciver_id]
-        print(message.reciver_id)
+        ending_node = nodes[message.reciver_id]        
 
-        y_distance = (ending_node.rect.top - starting_node.rect.top) + 18
+        y_distance = (ending_node.rect.top - starting_node.rect.top) + 24
         is_up = -1 if (y_distance < 0 ) else 1
         enter_left = 1 if (node_sending == 0) else -1
         sending_message = Message((starting_node.rect.right + 3, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left, message.is_valid)
+        pygame.display.update(all.draw(screen))
         messages.append(sending_message)
     
-    message_out
+    message_out.play()
     return messages
         
 
