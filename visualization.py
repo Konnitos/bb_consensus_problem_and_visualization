@@ -11,6 +11,7 @@ NUM_OF_NODES = 2
 FORCE_TRAITOR_LEADER = False
 START_SCREEN = True
 REPLAY_SCREEN = False
+DEFULT_VALUE = 1
 
 
 def load_image(file):
@@ -39,10 +40,17 @@ def load_sound(file):
 class Leader(pygame.sprite.Sprite):
     images = []
 
-    def __init__(self, starting_point, is_traitor = False):
+    def __init__(self, starting_point, is_traitor = False, is_consensus_time = False, original_order = 0):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.image = self.images[is_traitor] 
+        self.is_traitor = is_traitor
+        self.is_consensus_time = is_consensus_time
+        self.orignal_order = original_order
         self.rect = self.image.get_rect(topleft=starting_point)
+
+    def update(self):
+        if(self.is_consensus_time and not self.is_traitor):
+            Text_field((self.rect.left - 32, self.rect.top - 32), "We should Attack!!" if self.orignal_order else "We should Retreat", 35)
 
 class General(pygame.sprite.Sprite):
     images = []
@@ -50,8 +58,14 @@ class General(pygame.sprite.Sprite):
     def __init__(self, starting_point, is_traitor = False):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.image = self.images[is_traitor] 
+        self.is_traitor = is_traitor
+        self.decision = None
         self.rect = self.image.get_rect(topleft=starting_point)
         self.extracted_set = set()
+
+    def update(self):
+        if(not self.is_traitor and self.decision != None):
+            Text_field((self.rect.right +30, self.rect.top + 15), "ATTACK!!!!" if self.decision else "RETREAT", 35) 
 
 class Message(pygame.sprite.Sprite):
     images = []
@@ -68,13 +82,14 @@ class Message(pygame.sprite.Sprite):
         self.y_moved = 0
         self.is_up = is_up
         self.y_distance_done = False
-        self.enter_x_value = 100
+        self.enter_x_value = 120
         self.enter_x_moved = 0
         self.enter_left = enter_left
         self.enter_x_done = False
         self.step = 0
         self.is_valid = is_valid
         self.text_field = Text_field((self.rect.left, self.rect.top), str(self.payload), 30)
+        self.life_time = 0
 
     def update(self):
         if(self.step == 0):
@@ -101,7 +116,9 @@ class Message(pygame.sprite.Sprite):
             self.rect.move_ip(0,(self.speed * self.is_up))
         else:
             self.y_distance_done = True
-            # self.step = 2
+            self.life_time += 1
+            if(self.life_time > 50):
+                self.step = 2
 
     def enter(self):
         if(self.enter_x_moved <= self.enter_x_value):
@@ -202,10 +219,11 @@ def main():
     node_group = pygame.sprite.Group()
     message_group = pygame.sprite.Group()
     button_group = pygame.sprite.Group()
+    general_group = pygame.sprite.Group()
     all = pygame.sprite.RenderUpdates()
 
     Leader.containers = node_group, all
-    General.containers = node_group, all
+    General.containers = node_group, general_group, all
     Message.containers = message_group, all
     CheckButton.containers = button_group, all
     Button.containers = button_group, all
@@ -219,7 +237,7 @@ def main():
     all.empty()
     pygame.display.update()
     
-    bb_replay(clock, screen,background, all, node_group, message_group)
+    bb_replay(clock, screen,background, all, node_group, message_group, button_group, general_group)
     
 def start_screen(clock, screen, background, arrow, all, button_group):
     
@@ -242,7 +260,9 @@ def start_screen(clock, screen, background, arrow, all, button_group):
     traitor_count_up_button = Button((triator_count_text_field.rect.right, triator_count_text_field.rect.top), arrow, num_of_traitors_increase_callback)
     traitor_count_down_button = Button((triator_count_text_field.rect.right, traitor_count_up_button.rect.bottom), pygame.transform.rotate(arrow, 180), num_of_traitors_decrease_callback)
     
-    start_simulation_text_field = Text_field((20, 400), "Start Simulation !", 40)
+    Text_field((20, 400), "0 is Retreat and 1 is Attack, defult general behavior is 1", 40)
+
+    start_simulation_text_field = Text_field((20, 450), "Start Simulation !", 40)
     start_simulation_button = Button((start_simulation_text_field.rect.right + 10, start_simulation_text_field.rect.top), pygame.transform.rotate(arrow, -90), start_simulation_callback)
 
     while START_SCREEN:
@@ -267,7 +287,7 @@ def start_screen(clock, screen, background, arrow, all, button_group):
 
         clock.tick(FPS)
 
-def bb_replay(clock , screen , background, all, node_group, message_group):
+def bb_replay(clock , screen , background, all, node_group, message_group, button_group, general_group):
     
     Text_field((20,20), "Simulating BB Consensus", 75)
 
@@ -275,7 +295,8 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     pygame.display.update(all.draw(screen))
 
     network = run_bb_simulation(NUM_OF_NODES, NUM_OF_TRAITORS, FORCE_TRAITOR_LEADER)
-    round_dict = run_bb_simulation_and_process_output(network)
+    round_dict = process_bb_simulation_output(network)
+    round_count = 1
 
     pop = load_sound("pop.mp3")
     dink = load_sound("dink.wav")
@@ -287,7 +308,6 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     all.empty()
     pygame.display.update()
     
-    buttons = []
     nodes = []
     general_sets = {}
 
@@ -299,7 +319,7 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
     for i in range(1, NUM_OF_NODES):
         pygame.time.wait(500)
         general = General((320, (i*104)), network[i].is_traitor)
-        general_extracted_set = Text_field((general.rect.left, general.rect.bottom + 5), str(general.extracted_set), 40)
+        general_extracted_set = Text_field((general.rect.left, general.rect.bottom + 5), f"{i} s= {general.extracted_set}", 40)
 
         pygame.display.update(all.draw(screen))
         pop.play()
@@ -308,41 +328,58 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
         general_sets[i] = general_extracted_set
 
     pygame.time.wait(500)
-    
-    round_count= 1 
-    node_sending = 0
+
 
     round_text_field = Text_field((0,0), "Round: ", 70)
     round_count_text_field = Text_field((round_text_field.rect.right,0), str(round_count) ,70)
 
-    sent_messages = draw_messages(round_count, node_sending, nodes, round_dict, all , screen, message_out)
+    for message in message_group.sprites():
+        if(message.y_distance_done):
+            pygame.time.wait(250)
+            message.step = 2
 
     pause = False
+    messages_sent = 0
+    messages_in_round = len(round_dict[round_count])
+    coms_over = False
+
     while REPLAY_SCREEN:
 
         for event in pygame.event.get():
 
-            if(pause): break
-
             if event.type == pygame.QUIT:
                 pygame.quit()
-            
+
+            if(pause): break
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 x,y = event.pos
-                for button in buttons:
+                for button in button_group.sprites():
                     if button.rect.collidepoint(x,y):
                         button.callback()
 
         if(pause): continue
 
         all.clear(screen,background)
+        all.update()
 
         round_count_text_field.text = str(round_count)
 
         for (id, set_text_field) in general_sets.items():
-            set_text_field.text = str(nodes[id].extracted_set)
+            set_text_field.text = f"{id} s= {nodes[id].extracted_set}"
 
-        all.update()
+        if(len(message_group.sprites()) < 1 and not coms_over):
+            if(messages_sent < messages_in_round):
+                pygame.time.wait(200)
+                draw_message(nodes,round_dict[round_count][messages_sent], message_out)
+            
+            elif(round_count < NUM_OF_TRAITORS + 1):
+                round_count += 1
+                messages_sent = 0
+                messages_in_round = len(round_dict[round_count])
+
+            else:
+                coms_over = True
 
         for (node, message_list) in pygame.sprite.groupcollide(node_group, message_group, 0, 1).items():
             if(message_list[0].is_valid):
@@ -351,6 +388,20 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
             else:
                 dink.play()
 
+            message_list[0].text_field.kill()
+            messages_sent += 1
+
+        if(coms_over):
+            if( not leader.is_traitor):
+                leader.orignal_order = round_dict[1][0].payload
+                leader.is_consensus_time = True
+
+            for general in general_group:
+                if(not general.is_traitor and general.decision == None):
+                    general.decision = general.extracted_set.pop() if len(general.extracted_set) == 1 else DEFULT_VALUE
+
+
+
         dirty = all.draw(screen)
         pygame.display.update(dirty)
 
@@ -358,26 +409,16 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
 
     pygame.quit()
 
-def draw_messages(round_count, node_sending, nodes, round_dict, all, screen, message_out):
-    messages_to_draw = round_dict[round_count][node_sending]
-    messages = []
+def draw_message(nodes, message, message_out):
 
-    print([x.__dict__ for x in messages_to_draw])
-
-    for message in messages_to_draw:
-        print(message.payload)
-        starting_node = nodes[message.sender_id]
-        ending_node = nodes[message.reciver_id]        
-
-        y_distance = (ending_node.rect.top - starting_node.rect.top) + 24
-        is_up = -1 if (y_distance < 0 ) else 1
-        enter_left = 1 if (node_sending == 0) else -1
-        sending_message = Message((starting_node.rect.right + 3, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left, message.is_valid)
-
-        messages.append(sending_message)
+    starting_node = nodes[message.sender_id]
+    ending_node = nodes[message.reciver_id]         
+    y_distance = (ending_node.rect.top - starting_node.rect.top) + 24
+    is_up = -1 if (y_distance < 0 ) else 1
+    enter_left = 1 if (message.sender_id == 0) else -1
+    Message((starting_node.rect.right + 3, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left, message.is_valid)
     
     message_out.play()
-    return messages
         
 
 def force_traitor_leader_checkbox_callback():
@@ -411,22 +452,26 @@ def start_simulation_callback():
     START_SCREEN = False
     REPLAY_SCREEN = True
 
-def run_bb_simulation_and_process_output(network: dict[Node]):
+def process_bb_simulation_output(network: dict[Node]):
 
     round_dict = {}
 
     for i in range(0, NUM_OF_TRAITORS + 1):
-        round_dict[i + 1] = {}
-        for j in range(0, NUM_OF_NODES):
-            round_dict[i + 1][j] = []
+        round_dict[i + 1] = []
 
     for id, node in network.items():
         for message in node.all_messages:
             message.reciver_id = id
             message.is_valid = message in node.valid_messages
-            round_dict[message.round_sent][message.sender_id].append(message)
+            round_dict[message.round_sent].append(message)
+
+    for i in range(0, NUM_OF_TRAITORS + 1):
+        round_dict[i + 1].sort(key=sender_id)
 
     return round_dict   
+
+def sender_id(message):
+    return message.sender_id
 
 if __name__ == "__main__":
     main()
