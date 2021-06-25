@@ -12,6 +12,7 @@ FORCE_TRAITOR_LEADER = False
 START_SCREEN = True
 REPLAY_SCREEN = False
 
+
 def load_image(file):
     """ loads an image, prepares it for play
     """
@@ -73,8 +74,7 @@ class Message(pygame.sprite.Sprite):
         self.enter_x_done = False
         self.step = 0
         self.is_valid = is_valid
-        self.font = pygame.font.Font(None, 30)
-        self.color = pygame.Color("Black")
+        self.text_field = Text_field((self.rect.left, self.rect.top), str(self.payload), 30)
 
     def update(self):
         if(self.step == 0):
@@ -86,7 +86,7 @@ class Message(pygame.sprite.Sprite):
         if(self.step == 2):
             self.enter()
 
-        self.image.blit(self.font.render(str(self.payload), 0, self.color), (4,8))
+        self.text_field.rect = self.rect
 
     def exit(self):
         if(self.rect.right <= self.leave_start_x and not self.leave_start_x_done):
@@ -101,7 +101,7 @@ class Message(pygame.sprite.Sprite):
             self.rect.move_ip(0,(self.speed * self.is_up))
         else:
             self.y_distance_done = True
-            self.step = 2
+            # self.step = 2
 
     def enter(self):
         if(self.enter_x_moved <= self.enter_x_value):
@@ -201,18 +201,19 @@ def main():
 
     node_group = pygame.sprite.Group()
     message_group = pygame.sprite.Group()
+    button_group = pygame.sprite.Group()
     all = pygame.sprite.RenderUpdates()
 
     Leader.containers = node_group, all
     General.containers = node_group, all
     Message.containers = message_group, all
-    CheckButton.containers = all
-    Button.containers = all
+    CheckButton.containers = button_group, all
+    Button.containers = button_group, all
     Text_field.containers = all
     Node_count_text_field.containers = all
     Traitor_count_text_field.containers = all
 
-    start_screen(clock, screen, background, arrow, all)
+    start_screen(clock, screen, background, arrow, all, button_group)
     
     all.clear(screen, background)
     all.empty()
@@ -220,13 +221,12 @@ def main():
     
     bb_replay(clock, screen,background, all, node_group, message_group)
     
-def start_screen(clock, screen, background, arrow, all):
-    buttons = []
-
+def start_screen(clock, screen, background, arrow, all, button_group):
+    
     Text_field((20,20), "BB Consensus In Action", 100)
 
     force_traitor_leader_button = CheckButton((20, 100), force_traitor_leader_checkbox_callback)
-    buttons.append(force_traitor_leader_button)
+    
 
     Text_field((force_traitor_leader_button.rect.right + 10, force_traitor_leader_button.rect.y + 5), "Force the leader to be a traitor?", 30)
 
@@ -234,21 +234,16 @@ def start_screen(clock, screen, background, arrow, all):
     node_count_text_field_x = (number_of_nodes_text_field.rect.right - number_of_nodes_text_field.rect.left)/2
     node_count_text_field = Node_count_text_field((node_count_text_field_x, 200), 100)
     node_count_up_button = Button((node_count_text_field.rect.right, node_count_text_field.rect.top), arrow, num_of_node_increase_callback)
-    buttons.append(node_count_up_button)
     node_count_down_button = Button((node_count_text_field.rect.right,node_count_up_button.rect.bottom), pygame.transform.rotate(arrow, 180), num_of_node_decrease_callback)
-    buttons.append(node_count_down_button)
-
+    
     number_of_traitors_text_field = Text_field((20,280), "Number of Traitors:", 30)
     traitor_count_text_field_x = (number_of_traitors_text_field.rect.right - number_of_traitors_text_field.rect.left)/2
     triator_count_text_field = Traitor_count_text_field((traitor_count_text_field_x, 300), 100)
     traitor_count_up_button = Button((triator_count_text_field.rect.right, triator_count_text_field.rect.top), arrow, num_of_traitors_increase_callback)
-    buttons.append(traitor_count_up_button)
     traitor_count_down_button = Button((triator_count_text_field.rect.right, traitor_count_up_button.rect.bottom), pygame.transform.rotate(arrow, 180), num_of_traitors_decrease_callback)
-    buttons.append(traitor_count_down_button)
-
+    
     start_simulation_text_field = Text_field((20, 400), "Start Simulation !", 40)
     start_simulation_button = Button((start_simulation_text_field.rect.right + 10, start_simulation_text_field.rect.top), pygame.transform.rotate(arrow, -90), start_simulation_callback)
-    buttons.append(start_simulation_button)
 
     while START_SCREEN:
 
@@ -259,7 +254,7 @@ def start_screen(clock, screen, background, arrow, all):
             
             if event.type == pygame.MOUSEBUTTONDOWN:
                 x,y = event.pos
-                for button in buttons:
+                for button in button_group.sprites():
                     if button.rect.collidepoint(x,y):
                         button.callback()
 
@@ -310,7 +305,7 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
         pop.play()
 
         nodes.append(general)
-        general_sets[1] = general_extracted_set
+        general_sets[i] = general_extracted_set
 
     pygame.time.wait(500)
     
@@ -349,10 +344,10 @@ def bb_replay(clock , screen , background, all, node_group, message_group):
 
         all.update()
 
-        for (message, node) in pygame.sprite.groupcollide(message_group, node_group, 1, 0).items():
-            if(message.is_valid):
+        for (node, message_list) in pygame.sprite.groupcollide(node_group, message_group, 0, 1).items():
+            if(message_list[0].is_valid):
                 valid_message.play()
-                node[0].extracted_set.add(message.payload)
+                node.extracted_set.add(message_list[0].payload)
             else:
                 dink.play()
 
@@ -367,7 +362,10 @@ def draw_messages(round_count, node_sending, nodes, round_dict, all, screen, mes
     messages_to_draw = round_dict[round_count][node_sending]
     messages = []
 
+    print([x.__dict__ for x in messages_to_draw])
+
     for message in messages_to_draw:
+        print(message.payload)
         starting_node = nodes[message.sender_id]
         ending_node = nodes[message.reciver_id]        
 
@@ -375,7 +373,7 @@ def draw_messages(round_count, node_sending, nodes, round_dict, all, screen, mes
         is_up = -1 if (y_distance < 0 ) else 1
         enter_left = 1 if (node_sending == 0) else -1
         sending_message = Message((starting_node.rect.right + 3, starting_node.rect.top + 16), message.payload, y_distance, is_up, enter_left, message.is_valid)
-        pygame.display.update(all.draw(screen))
+
         messages.append(sending_message)
     
     message_out.play()
