@@ -3,10 +3,11 @@ from Message import Message
 from Node import Node, generate_hash
 import random
 
-def run_bb_problem(number_of_generals:int, number_of_traitors:int = 0, force_traitor_leader = False):
+def run_bb_simulation(number_of_generals:int, number_of_traitors:int = 0, force_traitor_leader = False):
     network = build_network(number_of_generals, number_of_traitors, force_traitor_leader)
     public_keys = {id:node.public_key for (id,node) in network.items()}
     get_consensus(number_of_traitors + 1, network, public_keys)
+    return network
     
 def build_network(general_num, traitor_num, force_traitor_leader, node_defult = 1):
     nodes = {}
@@ -40,24 +41,34 @@ def get_consensus(rounds, network: dict[int:Node], public_keys):
     leader_node = network[0]
     general_nodes:list[Node] = [node for (id,node) in network.items() if id != 0]
 
+    honest_leader_first_payload = 0
+
     if(leader_node.is_traitor):
         traitor_leader_activity(leader_node, general_nodes)
     else:
         message_payload = random.randint(0,1)
         message = Message(message_payload, leader_node.id, 1, [leader_node.sign(message_payload)])
         broadcast(message, general_nodes)
+        honest_leader_first_payload = message.payload
 
     for i in range(0,rounds):
         receive_messages_from_broadcast(general_nodes)
         process_unseen_messages(general_nodes, leader_node, i + 1, public_keys)
 
+    if(not leader_node.is_traitor):
+        print(f"Honest leader said {honest_leader_first_payload}") 
+
     for node in general_nodes:
         node.make_decision()
+        network[node.id] = node
+
+    return network    
 
 def broadcast(message: Message, receiving_nodes: list[Node]):
     for node in receiving_nodes:
         if(node.id != message.sender_id):
-            node.to_be_received_messages.append(message)
+            broadcast_message = Message(message.payload, message.sender_id, message.round_sent, message.signatures)
+            node.to_be_received_messages.append(broadcast_message)
 
 def receive_messages_from_broadcast(nodes: list[Node]):
     for node in nodes:
@@ -108,5 +119,6 @@ def traitor_general_activity(traitor_general_node: Node, leader_node: Node, mess
             elif(traitor_action == 2):
                 next_message = Message(None, traitor_general_node.id, round_num, [None])
                 node.to_be_received_messages.append(next_message)
-            
-run_bb_problem(4, 3, True)
+
+if __name__ == "__main__":
+    run_bb_simulation(5, 2)
