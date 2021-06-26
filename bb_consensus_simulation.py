@@ -54,7 +54,7 @@ def get_consensus(rounds, network: dict[int:Node], public_keys):
     for i in range(0,rounds):
         receive_messages_from_broadcast(general_nodes)
         process_unseen_messages(general_nodes, leader_node, i + 1, public_keys)
-
+    
     if(not leader_node.is_traitor):
         print(f"Honest leader said {honest_leader_first_payload}") 
 
@@ -76,13 +76,15 @@ def receive_messages_from_broadcast(nodes: list[Node]):
         node.to_be_received_messages = []
 
 def process_unseen_messages(nodes: list[Node], leader_node, round_num, public_keys):
+    print(round_num)
+    
     for node in nodes:
         for message in node.unseen_messages:
             if(node.validate_message(message, public_keys, round_num)):
                 if(node.is_traitor):
                     traitor_general_activity(node, leader_node, message, nodes, round_num)
                 else:
-                    broadcast(Message(message.payload, node.id, round_num, message.signatures + [node.sign(message.payload)]), nodes)
+                    broadcast(Message(message.payload, node.id, round_num + 1, message.signatures + [node.sign(message.payload)]), nodes)
         
         node.unseen_messages = []
 
@@ -105,20 +107,20 @@ def traitor_general_activity(traitor_general_node: Node, leader_node: Node, mess
                 traitor_payload = 1 if message.payload == 0 else 1
 
                 if(leader_node.is_traitor and len(message.signatures) == 1):    
-                    next_message = Message(traitor_payload, traitor_general_node.id, round_num, [leader_node.sign(traitor_payload) , traitor_general_node.sign(traitor_payload)])
+                    next_message = Message(traitor_payload, traitor_general_node.id, round_num + 1, [leader_node.sign(traitor_payload) , traitor_general_node.sign(traitor_payload)])
                     node.to_be_received_messages.append(next_message)
 
                 else: 
-                    next_message = Message(traitor_payload, traitor_general_node.id, round_num, message.signatures + [traitor_general_node.sign(message.payload)])    
+                    next_message = Message(traitor_payload, traitor_general_node.id, round_num + 1, message.signatures + [traitor_general_node.sign(message.payload)])    
                     node.to_be_received_messages.append(next_message)
 
             elif(traitor_action == 1):
-                next_message = Message(message.payload, traitor_general_node.id, round_num, message.signatures + [traitor_general_node.sign(message.payload)])
+                next_message = Message(message.payload, traitor_general_node.id, round_num + 1, message.signatures + [traitor_general_node.sign(message.payload)])
                 node.to_be_received_messages.append(next_message)
 
             elif(traitor_action == 2):
-                next_message = Message(None, traitor_general_node.id, round_num, [None])
+                next_message = Message(None, traitor_general_node.id, round_num + 1, [None])
                 node.to_be_received_messages.append(next_message)
 
 if __name__ == "__main__":
-    run_bb_simulation(5, 2)
+    run_bb_simulation(3, 0)
