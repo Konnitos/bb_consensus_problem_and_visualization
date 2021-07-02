@@ -88,7 +88,7 @@ class Message(pygame.sprite.Sprite):
         self.enter_x_done = False
         self.step = 0
         self.is_valid = is_valid
-        self.text_field = Text_field((self.rect.left, self.rect.top), str(self.payload), 30)
+        self.text_field = Text_field((self.rect.left, self.rect.top), str(self.payload), 35)
         self.life_time = 0
         self.signature_text_field = Text_field((self.rect.left, self.rect.bottom + 5), f"Sign:{signatures}", 30)
 
@@ -101,6 +101,9 @@ class Message(pygame.sprite.Sprite):
 
         if(self.step == 2):
             self.enter()
+        
+        if(self.step == 3):
+            self.backup_die()
 
         self.text_field.rect = self.rect
         self.signature_text_field.rect.x = self.rect.x
@@ -121,6 +124,7 @@ class Message(pygame.sprite.Sprite):
             self.y_distance_done = True
             self.life_time += 1
             if(self.life_time > 60):
+                self.life_time = 0
                 self.step = 2
 
     def enter(self):
@@ -129,6 +133,15 @@ class Message(pygame.sprite.Sprite):
             self.rect.move_ip((self.speed * self.enter_left), 0 )
         else:
             self.enter_x_done = True
+            
+
+    def backup_die(self):
+        if(self.life_time < 10):
+            self.life_time += 1
+            self.rect.move_ip((self.speed * (0 - self.enter_left)), 0 )
+        else:
+            self.kill()
+
             
 class CheckButton(pygame.sprite.Sprite):
     images = []
@@ -209,6 +222,7 @@ def main():
     # loading in assets
     leader = load_image("leader.png")
     arrow = load_image("arrow.png")
+    pause = load_image("pause.png")
     Leader.images = [leader, load_image("tleader.png")]
     General.images = [load_image("general.png"), load_image("tgeneral.png")]
     Message.images = [load_image("letter.png")] 
@@ -240,7 +254,7 @@ def main():
     all.empty()
     pygame.display.update()
     
-    bb_replay(clock, screen,background, all, node_group, message_group, button_group, general_group, arrow)
+    bb_replay(clock, screen,background, all, node_group, message_group, button_group, general_group, arrow, pause)
     
 def start_screen(clock, screen, background, arrow, all, button_group):
     
@@ -288,7 +302,7 @@ def start_screen(clock, screen, background, arrow, all, button_group):
 
         clock.tick(FPS)
 
-def bb_replay(clock , screen , background, all, node_group, message_group, button_group, general_group, arrow):
+def bb_replay(clock , screen , background, all, node_group, message_group, button_group, general_group, arrow, pause):
     
     Text_field((20,20), "Simulating BB Consensus", 75)
 
@@ -311,6 +325,9 @@ def bb_replay(clock , screen , background, all, node_group, message_group, butto
     
     restart_text_field = Text_field((20,550), "Back to Start? ", 40)
     Button((restart_text_field.rect.right + 10, 550), pygame.transform.rotate(arrow,90), restart_callback)
+
+    pause_text_field = Text_field((restart_text_field.rect.right + 60,550), "Pause? ", 40)
+    pause_button = Button((pause_text_field.rect.right + 10 , 550), pause, blank_callback)
 
     nodes = []
     general_sets = {}
@@ -351,6 +368,11 @@ def bb_replay(clock , screen , background, all, node_group, message_group, butto
     while REPLAY_SCREEN:
 
         for event in pygame.event.get():
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                x,y = event.pos
+                if pause_button.rect.collidepoint(x,y):
+                    pause = not pause
 
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -387,11 +409,13 @@ def bb_replay(clock , screen , background, all, node_group, message_group, butto
 
         round_count_text_field.text = str(round_count)
 
-        for (node, message_list) in pygame.sprite.groupcollide(node_group, message_group, 0, 1).items():
+        for (node, message_list) in pygame.sprite.groupcollide(node_group, message_group, 0, 0).items():
             if(message_list[0].is_valid):
                 valid_message.play()
                 node.extracted_set.add(message_list[0].payload)
+                message_list[0].kill()
             else:
+                message_list[0].step = 3
                 dink.play()
 
             message_list[0].text_field.kill()
@@ -458,6 +482,9 @@ def start_simulation_callback():
     global REPLAY_SCREEN
     START_SCREEN = not START_SCREEN
     REPLAY_SCREEN = not REPLAY_SCREEN
+
+def blank_callback():
+    pass
 
 def restart_callback():
     start_simulation_callback()
