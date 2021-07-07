@@ -75,9 +75,7 @@ def receive_messages_from_broadcast(nodes: list[Node]):
         node.unseen_messages = node.to_be_received_messages
         node.to_be_received_messages = []
 
-def process_unseen_messages(nodes: list[Node], leader_node, round_num, public_keys):
-    print(round_num)
-    
+def process_unseen_messages(nodes: list[Node], leader_node, round_num, public_keys):    
     for node in nodes:
         for message in node.unseen_messages:
             if(node.validate_message(message, public_keys, round_num)):
